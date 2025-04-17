@@ -46,7 +46,6 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
             sendHello(update);
         } else {
             sendSimpleMessage(update, "Я не понял... :-( ");
-//            throw new IllegalStateException("Unexpected value: " + update.message().text());
         }
     }
 
