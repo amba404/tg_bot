@@ -12,6 +12,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import pro.sky.telegrambot.repository.NotificationTaskRepository;
 
 import javax.annotation.PostConstruct;
 import java.util.List;
@@ -23,8 +24,13 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
 
     private final TelegramBot telegramBot;
 
-    public TelegramBotUpdatesListener(TelegramBot telegramBot) {
+    private final NotificationTaskRepository notificationTaskRepository;
+
+    public TelegramBotUpdatesListener(
+            TelegramBot telegramBot,
+            NotificationTaskRepository notificationTaskRepository) {
         this.telegramBot = telegramBot;
+        this.notificationTaskRepository = notificationTaskRepository;
     }
 
     @PostConstruct
@@ -54,7 +60,7 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
         SendMessage request = new SendMessage(chatId, text)
                 .parseMode(ParseMode.HTML)
                 .disableNotification(true)
-                .replyParameters( new ReplyParameters(update.message().messageId())) ;
+                .replyParameters(new ReplyParameters(update.message().messageId()));
 
         SendResponse sendResponse = telegramBot.execute(request);
         boolean ok = sendResponse.isOk();
