@@ -1,3 +1,0 @@
-databaseChangeLog: # параметр в котором находятся миграции
-  - include: # список активных миграций
-      file: liquibase/scripts/lesson-db-migration.sql

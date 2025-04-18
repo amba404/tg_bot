@@ -12,13 +12,40 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import pro.sky.telegrambot.model.NotificationTask;
 import pro.sky.telegrambot.repository.NotificationTaskRepository;
 
 import javax.annotation.PostConstruct;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class TelegramBotUpdatesListener implements UpdatesListener {
+
+    enum Emoji {
+        HELLO(0x1F64B),
+        SMILE(0x1F603),
+        WIRK(0x1F609),
+        DISAPOINTED(0x1F61E);
+
+        private int code;
+
+        Emoji(int code) {
+            this.code = code;
+        }
+
+        public int getCode() {
+            return code;
+        }
+
+        @Override
+        public String toString() {
+            return new String(Character.toChars(code));
+        }
+    }
 
     private final Logger logger = LoggerFactory.getLogger(TelegramBotUpdatesListener.class);
 
@@ -46,35 +73,59 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
 
     private void processUpdate(Update update) {
         logger.info("Processing update: {}", update);
-        // Process your updates here
-        String text = update.message().text();
-        if (text.equals("/start")) {
-            sendHello(update);
+
+        Message message = update.message() == null ? update.editedMessage() : update.message();
+
+        if ("/start".equals(message.text())) {
+            sendHello(message);
+        } else if (saveNotificationTask(message)) {
+            sendSimpleMessage(message, "Понял! Сделаю " + Emoji.WIRK);
         } else {
-            sendSimpleMessage(update, "Я не понял... :-( ");
+            sendSimpleMessage(message, "Я не понял... " + Emoji.DISAPOINTED);
         }
     }
 
-    private void sendSimpleMessage(@NotNull Update update, String text) {
-        Long chatId = update.message().chat().id();
+    private boolean saveNotificationTask(Message message) {
+        String text = message.text();
+        Pattern pattern = Pattern.compile("(\\d{2}\\.\\d{2}\\.\\d{4}\\s\\d{2}:\\d{2})(\\s+)(.+)");
+        Matcher matcher = pattern.matcher(text);
+        if (matcher.find()) {
+            String textDate = matcher.group(1);
+            String textMessage = matcher.group(3);
+            LocalDateTime dateTime = LocalDateTime.parse(textDate, DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
+
+            NotificationTask newTask = new NotificationTask();
+            newTask.setDateTime(dateTime);
+            newTask.setTextMessage(textMessage);
+            newTask.setUserId(message.from().id());
+            newTask.setIsDone(false);
+            notificationTaskRepository.save(newTask);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private void sendSimpleMessage(@NotNull Message message, String text) {
+        Long chatId = message.chat().id();
         SendMessage request = new SendMessage(chatId, text)
                 .parseMode(ParseMode.HTML)
                 .disableNotification(true)
-                .replyParameters(new ReplyParameters(update.message().messageId()));
+                .replyParameters(new ReplyParameters(message.messageId()));
 
         SendResponse sendResponse = telegramBot.execute(request);
         boolean ok = sendResponse.isOk();
-        Message message = sendResponse.message();
     }
 
-    private void sendHello(@NotNull Update update) {
+    private void sendHello(@NotNull Message message) {
 
         String text = "Hello " +
-                update.message().chat().firstName() +
+                message.chat().firstName() +
                 " aka " +
-                update.message().chat().username() +
-                "!";
+                message.chat().username() +
+                "! " + Emoji.HELLO;
 
-        sendSimpleMessage(update, text);
+        sendSimpleMessage(message, text);
     }
 }
