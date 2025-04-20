@@ -8,9 +8,11 @@ import com.pengrad.telegrambot.model.request.ParseMode;
 import com.pengrad.telegrambot.model.request.ReplyParameters;
 import com.pengrad.telegrambot.request.SendMessage;
 import com.pengrad.telegrambot.response.SendResponse;
+import lombok.Getter;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import pro.sky.telegrambot.model.NotificationTask;
 import pro.sky.telegrambot.repository.NotificationTaskRepository;
@@ -18,6 +20,7 @@ import pro.sky.telegrambot.repository.NotificationTaskRepository;
 import javax.annotation.PostConstruct;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,32 +28,8 @@ import java.util.regex.Pattern;
 @Service
 public class TelegramBotUpdatesListener implements UpdatesListener {
 
-    enum Emoji {
-        HELLO(0x1F64B),
-        SMILE(0x1F603),
-        WIRK(0x1F609),
-        DISAPOINTED(0x1F61E);
-
-        private int code;
-
-        Emoji(int code) {
-            this.code = code;
-        }
-
-        public int getCode() {
-            return code;
-        }
-
-        @Override
-        public String toString() {
-            return new String(Character.toChars(code));
-        }
-    }
-
     private final Logger logger = LoggerFactory.getLogger(TelegramBotUpdatesListener.class);
-
     private final TelegramBot telegramBot;
-
     private final NotificationTaskRepository notificationTaskRepository;
 
     public TelegramBotUpdatesListener(
@@ -71,7 +50,7 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
         return UpdatesListener.CONFIRMED_UPDATES_ALL;
     }
 
-    private void processUpdate(Update update) {
+    void processUpdate(Update update) {
         logger.info("Processing update: {}", update);
 
         Message message = update.message() == null ? update.editedMessage() : update.message();
@@ -85,7 +64,7 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
         }
     }
 
-    private boolean saveNotificationTask(Message message) {
+    boolean saveNotificationTask(Message message) {
         String text = message.text();
         Pattern pattern = Pattern.compile("(\\d{2}\\.\\d{2}\\.\\d{4}\\s\\d{2}:\\d{2})(\\s+)(.+)");
         Matcher matcher = pattern.matcher(text);
@@ -97,7 +76,7 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
             NotificationTask newTask = new NotificationTask();
             newTask.setDateTime(dateTime);
             newTask.setTextMessage(textMessage);
-            newTask.setUserId(message.from().id());
+            newTask.setChatId(message.chat().id());
             newTask.setIsDone(false);
             notificationTaskRepository.save(newTask);
 
@@ -107,7 +86,7 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
         return false;
     }
 
-    private void sendSimpleMessage(@NotNull Message message, String text) {
+    void sendSimpleMessage(@NotNull Message message, String text) {
         Long chatId = message.chat().id();
         SendMessage request = new SendMessage(chatId, text)
                 .parseMode(ParseMode.HTML)
@@ -115,10 +94,12 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
                 .replyParameters(new ReplyParameters(message.messageId()));
 
         SendResponse sendResponse = telegramBot.execute(request);
-        boolean ok = sendResponse.isOk();
+        if (!sendResponse.isOk()) {
+            logger.error("Error sending message: {}. Response: {}", request, sendResponse);
+        }
     }
 
-    private void sendHello(@NotNull Message message) {
+    void sendHello(@NotNull Message message) {
 
         String text = "Hello " +
                 message.chat().firstName() +
@@ -127,5 +108,45 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
                 "! " + Emoji.HELLO;
 
         sendSimpleMessage(message, text);
+    }
+
+    @Scheduled(cron = "0 0/1 * * * *")
+    public void processNotifications() {
+        logger.info("Scheduled task executed");
+        List<NotificationTask> notificationTasks = notificationTaskRepository
+                .findAllByDateTimeEqualsAndIsDoneIsFalse(LocalDateTime.now()
+                        .truncatedTo(ChronoUnit.MINUTES));
+
+        notificationTasks.forEach(this::processTask);
+    }
+
+    void processTask(NotificationTask task) {
+        SendMessage message = new SendMessage(task.getChatId(), task.getTextMessage());
+        SendResponse response = telegramBot.execute(message);
+        if (response.isOk()) {
+            task.setIsDone(true);
+            notificationTaskRepository.save(task);
+        } else {
+            logger.error("Task {} was not sent. Response: {}", task, response);
+        }
+    }
+
+    @Getter
+    enum Emoji {
+        HELLO(0x1F64B),
+        SMILE(0x1F603),
+        WIRK(0x1F609),
+        DISAPOINTED(0x1F61E);
+
+        private final int code;
+
+        Emoji(int code) {
+            this.code = code;
+        }
+
+        @Override
+        public String toString() {
+            return new String(Character.toChars(code));
+        }
     }
 }

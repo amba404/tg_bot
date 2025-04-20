@@ -14,3 +14,7 @@ CREATE TABLE IF NOT EXISTS notification_task
 );
 
 CREATE INDEX IF NOT EXISTS notification_task_datetime_is_done ON notification_task (date_time, is_done);
+
+-- changeset Amba404:2
+ALTER TABLE notification_task
+    RENAME user_id to chat_id;

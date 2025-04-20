@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 
 @Getter
 @Setter
+@EqualsAndHashCode(of = "id")
 @Entity(name = "notification_task")
 public class NotificationTask {
     @Id
@@ -19,8 +21,8 @@ public class NotificationTask {
     private long id;
 
     @NotNull
-    @Column(name = "user_id")
-    private Long userId;
+    @Column(name = "chat_id")
+    private Long chatId;
 
     @NotNull
     @Column(name = "date_time")

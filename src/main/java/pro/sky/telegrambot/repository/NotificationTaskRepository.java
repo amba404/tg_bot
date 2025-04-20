@@ -9,5 +9,5 @@ import java.util.List;
 
 @Transactional
 public interface NotificationTaskRepository extends JpaRepository<NotificationTask, Long> {
-    List<NotificationTask> findAllByDateTimeIsBeforeAndIsDoneIsFalse(LocalDateTime dateTime);
+    List<NotificationTask> findAllByDateTimeEqualsAndIsDoneIsFalse(LocalDateTime dateTime);
 }

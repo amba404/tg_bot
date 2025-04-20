@@ -11,7 +11,6 @@ public class TelegramBotConfiguration {
 
     @Bean
     public TelegramBot telegramBot() {
-        //bot.execute(new DeleteMyCommands());
         return new TelegramBot(token);
     }
 
